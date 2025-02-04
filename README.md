@@ -12,6 +12,8 @@ pip install dimer_manipulator
 This is an example for using this code:
 
 ```python
+from dimer_search import DimerProcessor  # Import from the package
+
 # Example usage:
 processor = DimerProcessor(pdb_filename='dimer.pdb', atom_indices=[0, 1, 2])
 joined_molecule = processor.rotate_and_join(z_angle=35)
