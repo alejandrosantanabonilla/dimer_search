@@ -77,7 +77,7 @@ class DimerProcessor:
         mhplot = MHPlot()
         mhplot.save_figure(f"{self.output_filename_prefix}_summary.png")
 
-        traj_filename = f"minima.traj"
+        traj_filename = "minima.traj"
         traj = read(traj_filename)
         write(f"{self.output_filename_prefix}_minima.xyz", traj, format="xyz")
 
