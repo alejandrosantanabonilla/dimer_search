@@ -20,7 +20,7 @@ setup(
         "parmed",
         "ase",
         "tblite",
-        # Add other dependencies here
+        "wheel",
     ],
     classifiers=[  # Add classifiers for your package
         "Programming Language :: Python :: 3",

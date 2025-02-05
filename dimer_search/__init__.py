@@ -1,5 +1,3 @@
-from .create_dimer import DimerProcessor
-from .utils_mol import CreateDimer
-from .utils_mol import MolFrag # Import MolFrag if it's in utils_mol.py
+from .total_dimer import DimerProcessor,CreateDimer, MolFrag
 
-__all__ = ["CreateDimer", "DimerProcessor", "MolFrag"]  # Make these classes available
+__all__ = ["DimerProcessor", "CreateDimer", "MolFrag"]
