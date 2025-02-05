@@ -20,7 +20,7 @@ It's highly recommended to use a virtual environment to manage dependencies.  He
 python3 -m venv dimer_env  # Creates a virtual environment named "dimer_env"
 ```
 
-2. Activate the virtual environment:
+2. **Activate the virtual environment:**
 
 
 ```bash
@@ -28,14 +28,14 @@ source dimer_env/bin/activate  # On Linux/macOS
 dimer_env\Scripts\activate  # On Windows
 ```
 
-3. Clone the repository:
+3. **Clone the repository:**
 
 ```bash
 git clone https://github.com/alejandrosantanabonilla/dimer_search.git
 cd dimer_search
 ```
 
-4. Install dimer_search
+4. **Install dimer_search**
 
 ```bash
 pip install .
@@ -43,7 +43,7 @@ pip install .
 
 ## Usage
 
-1. MolFrag Class
+1. **MolFrag Class**
 Purpose: This class is used to break a molecule into fragments.
 
 Initialization:
@@ -66,7 +66,7 @@ print(pdb_blocks)
 
 This function splits the molecule into fragments and returns a list of PDB blocks (strings) for each fragment. It also writes the fragment files to disk according to the specified format and prefix.
 
-2. CreateDimer Class
+2. **CreateDimer Class**
 
 Purpose: This class handles the creation and manipulation of dimers.
 
@@ -88,7 +88,7 @@ rotated_mol2 = dimer.rotate_molecule_around_plane(dimer.mol2, atom_indices=[0, 1
 
 This rotates mol2 by 30 degrees around the Z-axis, where the Z-axis is defined by atoms with indices 0, 1, and 2.  Note that the atom_indices are 0-based.  You can also specify x_angle and y_angle for rotations around the X and Y axes, respectively.
 
-3. DimerProcessor Class
+3. **DimerProcessor Class**
 
 Purpose: This class manages the entire dimer processing workflow.
 
@@ -117,6 +117,8 @@ relaxed_molecule = processor.relax(method="GFN2-xTB", Ediff0=0.5, T0=1500.0, tot
 This relaxes the joined molecule using the GFN2-xTB method with specified parameters for MinimaHopping. The relaxed structure is written to my_dimer_minima.xyz.  A summary plot of the MinimaHopping trajectory is saved as my_dimer_summary.png.
 
 ## Example Usage
+
+The file **dimer.pdb** can be found in the folder **test**.
 
 ```python
 from dimer_search import *  
