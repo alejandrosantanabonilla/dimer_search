@@ -5,7 +5,7 @@ A Python package for creating and manipulating molecular dimers.  This package p
 ## Installation
 
 ```bash
-pip install dimer_manipulator
+pip install dimer_search
 ```
 ## Usage
 
