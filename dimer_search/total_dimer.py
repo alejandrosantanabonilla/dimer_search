@@ -7,6 +7,9 @@ from rdkit.Chem import AllChem, rdMolAlign
 import parmed as pmd
 from io import StringIO
 
+from openbabel import openbabel as ob
+from openbabel import pybel as pb
+
 from ase import Atoms
 from ase.io import write
 from ase import Atoms
@@ -18,11 +21,30 @@ from ase.io import read, write
 from ase.optimize.minimahopping import MHPlot
 
 class DimerProcessor:
-    def __init__(self, pdb_filename, atom_indices, output_filename_prefix="dimer"):
-        self.pdb_filename = pdb_filename
+    def __init__(self, xyz_filename, atom_indices, output_filename_prefix="dimer"):
+        self.xyz_filename = xyz_filename
         self.atom_indices = atom_indices
         self.output_filename_prefix = output_filename_prefix
-        self.mol = Chem.MolFromPDBFile(self.pdb_filename, removeHs=False)
+
+        ob_conversion = ob.OBConversion()
+        ob_conversion.SetInFormat("xyz")
+        ob_conversion.SetOutFormat("pdb")  # Or "mol" if you prefer RDKit Mol directly
+        mol = ob.OBMol()
+        #mol.OBMol.DeleteHydrogens()
+        mol.ConnectTheDots() 
+        mol.PerceiveBondOrders()
+        mol.AddHydrogens()
+        ob_conversion.ReadFile(mol, self.xyz_filename)  # Read XYZ
+
+        #Option 2: Convert directly to RDKit Mol (more efficient):
+        ob_conversion.SetOutFormat("mol") #Set the out format to mol
+        mol_block = ob_conversion.WriteString(mol) #Write the molecule as a mol block
+        rdkit_mol = Chem.MolFromMolBlock(mol_block,removeHs=False) #Create the rdkit mol object
+        self.mol = rdkit_mol
+
+        #rdkit_mol = Chem.MolFromPDBBlock(pdb_block) #Create the rdkit mol object
+        #self.mol = rdkit_mol #Assign the rdkit mol object
+
         self.mol_frag = MolFrag(self.mol)
         self.mol1, self.mol2 = self._get_fragments()
         self.dimer = CreateDimer(self.mol1, self.mol2)

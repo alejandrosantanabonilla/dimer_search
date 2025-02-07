@@ -15,6 +15,7 @@ setup(
     packages=find_packages(),  # Automatically find packages
     install_requires=[  # List your dependencies
         "rdkit-pypi",
+        "openbabel-wheel",
         "numpy",
         "scipy",
         "parmed",
