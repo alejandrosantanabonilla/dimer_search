@@ -1,237 +1,296 @@
-from rdkit import Chem
+import ase
+from ase.atoms import Atoms
 import numpy as np
-from scipy.spatial.transform import Rotation as R
-from rdkit.Chem import AllChem
-from rdkit.Chem import AllChem, rdMolAlign
-
-import parmed as pmd
-from io import StringIO
-
-from openbabel import openbabel as ob
-from openbabel import pybel as pb
-
-from ase import Atoms
-from ase.io import write
-from ase import Atoms
-from ase.optimize import BFGS
-from ase.optimize.minimahopping import MinimaHopping
-from tblite.ase import TBLite
-from ase.units import Bohr,Rydberg,kJ,kB,fs,Hartree,mol,kcal
 from ase.io import read, write
-from ase.optimize.minimahopping import MHPlot
+from scipy.spatial.transform import Rotation as R
 
-class DimerProcessor:
-    def __init__(self, xyz_filename, atom_indices, output_filename_prefix="dimer"):
-        self.xyz_filename = xyz_filename
-        self.atom_indices = atom_indices
-        self.output_filename_prefix = output_filename_prefix
+try:
+    from .utils import relax
+except ImportError:
+    # Fallback if running as a script and utils.py is in the same folder
+    try:
+        from utils import relax
+    except ImportError:
+        print("ERROR: Cannot find the 'relax' function. Ensure 'utils.py' is in the same directory or Python path.")
+        # Define a dummy relax function to allow the script to load
+        def relax(*args, **kwargs):
+            print("Dummy relax function called. 'utils.py' not found.")
+            return kwargs.get('atoms', None) # Return something simple
 
-        ob_conversion = ob.OBConversion()
-        ob_conversion.SetInFormat("xyz")
-        ob_conversion.SetOutFormat("pdb")  # Or "mol" if you prefer RDKit Mol directly
-        mol = ob.OBMol()
-        #mol.OBMol.DeleteHydrogens()
-        mol.ConnectTheDots() 
-        mol.PerceiveBondOrders()
-        mol.AddHydrogens()
-        ob_conversion.ReadFile(mol, self.xyz_filename)  # Read XYZ
-
-        #Option 2: Convert directly to RDKit Mol (more efficient):
-        ob_conversion.SetOutFormat("mol") #Set the out format to mol
-        mol_block = ob_conversion.WriteString(mol) #Write the molecule as a mol block
-        rdkit_mol = Chem.MolFromMolBlock(mol_block,removeHs=False) #Create the rdkit mol object
-        self.mol = rdkit_mol
-
-        #rdkit_mol = Chem.MolFromPDBBlock(pdb_block) #Create the rdkit mol object
-        #self.mol = rdkit_mol #Assign the rdkit mol object
-
-        self.mol_frag = MolFrag(self.mol)
-        self.mol1, self.mol2 = self._get_fragments()
-        self.dimer = CreateDimer(self.mol1, self.mol2)
-        self.joined_molecule = None
-
-    def _get_fragments(self):
-        pdb_blocks = self.mol_frag.get_mol_frags_blocks()
-        return Chem.MolFromPDBBlock(pdb_blocks[0], removeHs=False), Chem.MolFromPDBBlock(pdb_blocks[1], removeHs=False)
-
-    def rdkit_mol_to_ase_atoms(self, rdkit_mol: Chem.Mol) -> Atoms:
-        """Convert an RDKit molecule to an ASE Atoms object."""
-        ase_atoms = Atoms(
-            numbers=[atom.GetAtomicNum() for atom in rdkit_mol.GetAtoms()],
-            positions=rdkit_mol.GetConformer().GetPositions()
-        )
-        return ase_atoms
-
-    def rotate_and_join(self, z_angle):
-        """Rotates the second fragment, joins, and optionally writes to file."""
-        rotated_mol2 = self.dimer.rotate_molecule_around_plane(
-            self.dimer.mol2,
-            atom_indices=self.atom_indices,
-            z_angle=z_angle
-        )
-
-        ase_mol1 = self.rdkit_mol_to_ase_atoms(self.mol1)
-        ase_rotated_mol2 = self.rdkit_mol_to_ase_atoms(rotated_mol2)
-        self.joined_molecule = ase_mol1 + ase_rotated_mol2
-
-        output_filename = f"{self.output_filename_prefix}_initial.xyz"
-        write(output_filename, self.joined_molecule)
-        return self.joined_molecule
-
-    def relax(self, method="GFN2-xTB", Ediff0=1.0, T0=2000.0, totalsteps=10):
-        """Relaxes the joined molecule using TBLite and MinimaHopping with options.
-
-        Args:
-            method (str): The TBLite method to use (default: "GFN2-xTB").
-            Ediff0 (float): The energy difference threshold for MinimaHopping (default: 1.0).
-            T0 (float): The initial temperature for MinimaHopping (default: 2000.0).
-            totalsteps (int): The total number of MinimaHopping steps (default: 10).
-
-        Returns:
-            ase.Atoms: The relaxed ASE Atoms object.
-        """
-        if self.joined_molecule is None:
-            raise ValueError("Molecule must be joined first. Call rotate_and_join().")
-
-        print(f"Relaxing molecule with: method={method}, Ediff0={Ediff0}, T0={T0}, totalsteps={totalsteps}")  # Print parameters
-
-        calculator = TBLite(method=method)
-        self.joined_molecule.set_calculator(calculator)
-
-        hop = MinimaHopping(atoms=self.joined_molecule, Ediff0=Ediff0, T0=T0)
-        hop(totalsteps=totalsteps)
-
-        mhplot = MHPlot()
-        mhplot.save_figure(f"{self.output_filename_prefix}_summary.png")
-
-        traj_filename = str("minima.traj")
-        traj = read(traj_filename)
-        write(f"{self.output_filename_prefix}_minima.xyz", traj, format="xyz")
-
-        return self.joined_molecule
-
-class CreateDimer:
+class MoleculeProcessor:
     """
-    Class for creating and manipulating molecule dimers.
-    This class focuses on applying transformations to the second molecule (mol2) 
-    while keeping the first molecule (mol1) unchanged.
+    A class to process molecular structures, including loading, aligning, rotating, translating,
+    and optionally relaxing molecules.
+
+    Attributes:
+        input_file (str): Path to the input file containing the molecular structure.
+        output_file (str): Path to the output file where the processed structure will be saved.
+        original_atoms (Atoms): The original molecular structure loaded from the input file.
+        aligned_atoms (Atoms): The molecular structure after alignment and translation.
     """
-    def __init__(self, mol1, mol2):
-        """
-        Initializes CreateDimer object with two RDKit molecules.
-
-        Args:
-            mol1: The first RDKit molecule object.
-            mol2: The second RDKit molecule object.
-        """
-        self.mol1 = mol1
-        self.mol2 = mol2
-
-    def rotate_molecule_around_plane(self, mol, atom_indices, x_angle=0, y_angle=0, z_angle=0):
-        """
-        Rotates the given molecule around a plane defined by the provided atom indices.
-        The plane's normal vector is calculated using SVD.
-        Additional rotations around X, Y, and Z axes can also be applied using scipy.spatial.transform.Rotation.
-        The function does not modify the original molecule and returns a new molecule with the rotated conformation.
-
-        Args:
-            mol: The RDKit molecule object to rotate.
-            atom_indices: A list of atom indices (0-based) defining the plane.
-            x_angle: Rotation angle around the X-axis in degrees.
-            y_angle: Rotation angle around the Y-axis in degrees.
-            z_angle: Rotation angle around the Z-axis in degrees.
-
-        Returns:
-            A new RDKit molecule object with the rotated conformation.
-        """
-
-        # Create a copy of the molecule to avoid modifying the original
-        mol = Chem.Mol(mol)
-
-        # Get coordinates of the molecule
-        conf = mol.GetConformer()
-        coords = conf.GetPositions()
-
-        # Select atoms defining the plane
-        plane_atoms = coords[atom_indices]
-
-        # Compute the best-fit plane using SVD
-        centroid = np.mean(coords, axis=0)  # Use the centroid of the entire molecule
-        plane_atoms -= centroid
-        _, _, vh = np.linalg.svd(plane_atoms)
-        normal_vector = vh[-1, :]  # Normal vector of the plane
-
-        # Create a rotation object using scipy.spatial.transform.Rotation
-        # Correct the rotation axis by inverting the normal vector
-        #rotation = R.from_rotvec(-np.pi * normal_vector)  # Rotate by 180 degrees around the inverted normal vector
-
-        # Apply additional rotations around X, Y, and Z axes
-        rotation = R.from_euler('x', x_angle, degrees=True) * \
-                   R.from_euler('y', y_angle, degrees=True) * \
-                   R.from_euler('z', z_angle, degrees=True)
-
-        # Apply rotation to the molecule's coordinates
-        new_coords = rotation.apply(coords - centroid) + centroid
-
-        # Set the new coordinates for the molecule
-        for i in range(len(coords)):
-            conf.SetAtomPosition(i, new_coords[i])
-
-        return mol
-
     
-class MolFrag:
-    """
-    Class for handling molecule fragments.
-    """
-    def __init__(self, mol, output_format='pdb', write_files=False):
+    def __init__(self, input_file, output_file):
         """
-        Initializes MolFrag object with an RDKit molecule.
+        Initializes the MoleculeProcessor with input and output file paths.
 
         Args:
-            mol: An RDKit molecule object.
-            output_format: The desired output format ('pdb', 'xyz', or 'mol').
-            write_files: Whether to write the fragments to files (True/False).
+            input_file (str): Path to the input file containing the molecular structure.
+            output_file (str): Path to the output file where the processed structure will be saved.
         """
-        self.mol = mol
-        self.output_format = output_format
-        self.write_files = write_files
+        
+        self.input_file = input_file
+        self.output_file = output_file
+        self.original_atoms = None
+        self.aligned_atoms = None
+        print(f"MoleculeProcessor initialized for input '{input_file}', output '{output_file}'.")
 
-    def get_mol_frags_blocks(self, pdb_filename_prefix="mol_"):
+    def load_atoms(self):
         """
-        Splits a molecule into fragments, generates 3D coordinates,
-        and returns a list of PDB blocks for each fragment.
-
-        Args:
-            pdb_filename_prefix: Prefix for the PDB filenames.
+        Loads the molecular structure from the input file.
 
         Returns:
-            A list of PDB blocks (strings) for each fragment.
+            bool: True if the file was successfully loaded, False otherwise.
+
+        Raises:
+            FileNotFoundError: If the input file does not exist.
+            Exception: For other errors during file reading.
+        """
+        
+        print(f"Loading atoms from '{self.input_file}'...")
+        try:
+            self.original_atoms = read(self.input_file)
+            print(f"Successfully loaded {len(self.original_atoms)} atoms.")
+            return True
+        except FileNotFoundError:
+            print(f"Error: File '{self.input_file}' not found.")
+            self.original_atoms = None
+            return False
+        except Exception as e:
+            print(f"An error occurred while reading the file: {e}")
+            self.original_atoms = None
+            return False
+
+    def align_and_translate(self, atoms):
+        """
+        Aligns the molecule's principal axes with Cartesian axes and translates the center of mass (COM) to the origin.
+
+        Args:
+            atoms (Atoms): The molecular structure to align and translate.
+
+        Returns:
+            Atoms: A new `Atoms` object with the aligned and translated structure.
+            None: If the alignment or translation fails.
+
+        Notes:
+            - For single-atom structures, only the COM translation is performed.
+            - If the alignment fails, the method returns None.
         """
 
-        mol_frags = Chem.GetMolFrags(self.mol, asMols=True)
-        pdb_blocks = []
+        if not isinstance(atoms, Atoms) or len(atoms) == 0:
+             print("Warning: Cannot align empty atoms object.")
+             return None # Return None to indicate failure
+        print("Aligning molecule and translating COM to origin...")
+        if len(atoms) == 1:
+            print("Warning: Cannot align principal axes for a single atom. Only translating COM.")
+            new_atoms = atoms.copy()
+            new_atoms.positions -= new_atoms.get_center_of_mass() # Use positions directly
+            print("Single atom translated to origin.")
+            return new_atoms
 
-        # Define a dictionary to map output_format to the corresponding Chem function
-        format_to_function = {
-            'pdb': Chem.MolToPDBFile,
-            'xyz': Chem.MolToXYZFile,
-            'mol': Chem.MolToMolFile
-        }
+        new_atoms = atoms.copy()
+        # 1. Translate COM to origin
+        try:
+             com = new_atoms.get_center_of_mass()
+             new_atoms.positions -= com # Use positions directly
+        except Exception as e:
+            print(f"Warning: Could not calculate COM or translate: {e}")
+            # Decide if you want to proceed without centering or return None
+            return None # Indicate failure
 
-        for i, frag in enumerate(mol_frags):
-            # Generate PDB block (this remains the same)
-            pdb_block = Chem.MolToPDBBlock(frag)  
-            pdb_blocks.append(pdb_block)
+        # 2. Align principal axes
+        try:
+            inertia = new_atoms.get_inertia_tensor()
+            eigvals, eigvecs = np.linalg.eigh(inertia) # eigvecs columns are eigenvectors
+            # Ensure a right-handed coordinate system for the eigenvectors
+            if np.linalg.det(eigvecs) < 0.0:
+                eigvecs[:, -1] *= -1.0 # Flip the last eigenvector
 
-            if self.write_files:
-                # Get the appropriate function from the dictionary
-                write_function = format_to_function[self.output_format]  # Directly access using the key
+            # ASE's rotate method needs the vectors defining the rotation.
+            # We want to rotate FROM eigvecs TO the identity matrix (Cartesian axes).
+            # The 'v' argument in rotate should be the vectors *in their current orientation*
+            # The 'a' argument specifies *what they should become*.
+            # We rotate the eigenvectors (v=eigvecs) to align with Cartesian axes (a=[(1,0,0),(0,1,0),(0,0,1)])
+            new_atoms.rotate(v=eigvecs, a=[(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)])
+            print("Molecule aligned to principal axes and centered.")
+        except Exception as e:
+             print(f"Warning: Could not compute or apply principal axes alignment: {e}")
+             # Return centered atoms even if alignment fails
+             print("Returning centered (but possibly not aligned) atoms.")
+             # Depending on requirements, you might return None here if alignment is critical
 
-                # Determine file extension
-                file_extension = f".{self.output_format}"
+        return new_atoms
 
-                # Call the function to write the file
-                write_function(frag, f"{pdb_filename_prefix}{i+1}{file_extension}")
 
-        return pdb_blocks
+    def rotate_and_translate_copies(self, yaw, pitch, roll, translation_vector):
+        """
+        Rotates and translates multiple copies of the aligned molecule.
+
+        Args:
+            yaw (list[float]): List of yaw angles (rotation around Z-axis) in radians.
+            pitch (list[float]): List of pitch angles (rotation around Y-axis) in radians.
+            roll (list[float]): List of roll angles (rotation around X-axis) in radians.
+            translation_vector (list[list[float]]): List of translation vectors for each copy.
+
+        Returns:
+            Atoms: A combined `Atoms` object containing all rotated and translated copies.
+            None: If the operation fails.
+
+        Notes:
+            - The lengths of `yaw`, `pitch`, `roll`, and `translation_vector` must match.
+            - If alignment was not performed, this method will fail.
+        """
+
+        if self.aligned_atoms is None:
+            print("Error: Cannot rotate/translate copies because molecule alignment failed or wasn't performed.")
+            return None
+        if not (len(yaw) == len(pitch) == len(roll) == len(translation_vector)):
+             print("Error: Lengths of yaw, pitch, roll, and translation_vector arrays must match.")
+             return None
+
+        num_copies = len(yaw)
+        print(f"Creating {num_copies} rotated and translated copies...")
+        all_atoms_list = [] # Build a list of Atoms objects
+
+        for i in range(num_copies):
+            print(f"Processing copy {i+1}/{num_copies}...")
+            new_atoms_copy = self.aligned_atoms.copy()
+
+            # Create rotation object from Euler angles (ZYX convention)
+            # Ensure angles are in degrees if SciPy expects degrees, or radians if it expects radians (check docs - R.from_euler expects radians by default)
+            # Assuming yaw, pitch, roll provided to process_molecules are in RADIANS
+            try:
+                rotation = R.from_euler('zyx', [yaw[i], pitch[i], roll[i]])
+                # Note: new_atoms_copy is already centered from align_and_translate
+                # Apply rotation around the origin (current COM)
+                new_atoms_copy.positions = rotation.apply(new_atoms_copy.positions)
+                # Apply translation
+                new_atoms_copy.translate(translation_vector[i])
+                all_atoms_list.append(new_atoms_copy)
+            except Exception as e:
+                 print(f"Error during rotation/translation for copy {i+1}: {e}")
+                 # Decide whether to skip this copy or stop entirely
+                 return None # Stop if any copy fails
+
+        # Combine all individual Atoms objects into one large Atoms object
+        if not all_atoms_list:
+            print("Warning: No copies were successfully generated.")
+            return Atoms() # Return empty Atoms object
+
+        final_assembly = Atoms()
+        for atoms_obj in all_atoms_list:
+            final_assembly.extend(atoms_obj)
+
+        print(f"Generated final assembly with {len(final_assembly)} atoms.")
+        return final_assembly
+
+    def process_molecules(self,
+                          yaw_rad,
+                          pitch_rad,
+                          roll_rad,
+                          translation_vector,
+                          relax_molecule: bool = False, # Control if relaxation is done
+                          restart_relax: bool = False, # Control if relaxation should *try* to restart
+                          tblite_params=None,
+                          mh_params=None,
+                          totalsteps=20,
+                          output_filename_prefix="last"):
+        
+        """
+        Processes the molecules by loading, aligning, rotating, translating, and optionally relaxing them.
+
+        Args:
+            yaw_rad (list[float]): List of yaw angles (rotation around Z-axis) in radians.
+            pitch_rad (list[float]): List of pitch angles (rotation around Y-axis) in radians.
+            roll_rad (list[float]): List of roll angles (rotation around X-axis) in radians.
+            translation_vector (list[list[float]]): List of translation vectors for each copy.
+            relax_molecule (bool): Whether to perform relaxation on the final structure.
+            restart_relax (bool): Whether to restart relaxation from previous calculations.
+            tblite_params (dict): Parameters for the TBLite calculator.
+            mh_params (dict): Parameters for the Monte Carlo Metropolis-Hastings algorithm.
+            totalsteps (int): Maximum number of steps for relaxation.
+            output_filename_prefix (str): Prefix for output files generated during relaxation.
+
+        Returns:
+            Atoms: The final processed molecular structure (relaxed if requested).
+            None: If any step in the process fails.
+
+        Notes:
+            - The method writes the initial unrelaxed structure to the output file.
+            - If relaxation is requested, the relaxed structure is returned.
+        """
+
+        print("\n=== Starting Molecule Processing ===")
+        # 1. Load
+        if not self.load_atoms():
+            print("Processing failed: Could not load input file.")
+            return None # Indicate failure
+
+        # 2. Align original molecule
+        self.aligned_atoms = self.align_and_translate(self.original_atoms)
+        if self.aligned_atoms is None:
+             print("Processing failed: Alignment step failed.")
+             return None
+
+        # 3. Create rotated/translated assembly
+        rotated_atoms = self.rotate_and_translate_copies(yaw_rad, pitch_rad, roll_rad, translation_vector)
+
+        if not isinstance(rotated_atoms, Atoms) or len(rotated_atoms) == 0:
+            print("Processing failed: No atoms generated after rotation/translation.")
+            return None
+
+        # 4. Write the initial (unrelaxed) assembly
+        print(f"Writing initial generated structure to '{self.output_file}'...")
+        try:
+            write(self.output_file, rotated_atoms)
+            print(f"Successfully wrote initial structure with {len(rotated_atoms)} atoms.")
+        except Exception as e:
+            print(f"Error writing initial structure to '{self.output_file}': {e}")
+            # Decide if this error is critical
+            return None # Stop if writing initial file fails
+
+        # 5. Optional Relaxation
+        final_atoms = rotated_atoms # Default to the unrelaxed structure
+        if relax_molecule:
+            print(f"\n--- Relaxation Requested (restart={restart_relax}) ---")
+            try:
+                # Call the relax function from utils.py
+                # Pass the 'restart_relax' flag from this method to 'restart_calc' in relax()
+                final_atoms = relax(
+                    atoms=rotated_atoms.copy(), # Pass a copy to avoid modifying rotated_atoms if relax fails midway
+                    output_filename_prefix=output_filename_prefix,
+                    tblite_params=tblite_params,
+                    mh_params=mh_params,
+                    totalsteps=totalsteps,
+                    restart_calc=restart_relax # Pass the flag here
+                )
+                print(f"\n--- Relaxation process finished successfully ---")
+                # Note: relax() function handles writing its own specific outputs (_minima.xyz, _summary.png etc)
+            except FileNotFoundError as e:
+                 # This error is raised by relax() if restart_calc=True but no files found
+                 print(f"\n--- Relaxation Error ---")
+                 print(f"Relaxation failed: {e}")
+                 print("Cannot proceed with processing.")
+                 return None # Stop processing if restart failed when requested
+            except Exception as e:
+                 # Catch other potential errors during relaxation (calculator errors, MH errors)
+                 print(f"\n--- Relaxation Error ---")
+                 print(f"An unexpected error occurred during the relaxation process: {e}")
+                 print("Cannot proceed with processing.")
+                 return None # Stop processing if relaxation had a critical error
+
+        print("\n=== Molecule Processing Finished ===")
+
+        # Return the final state (relaxed if relaxation was done, otherwise the initial rotated structure)
+        return final_atoms
+
+
