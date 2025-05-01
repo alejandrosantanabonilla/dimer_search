@@ -49,7 +49,7 @@ result2 = processor2.process_molecules(
         yaw_rad=yaw, pitch_rad=pitch, roll_rad=roll, translation_vector=translations,
         relax_molecule=True,                # Turn relaxation ON
         restart_relax=False,                # Start fresh
-        totalsteps=50,                      # Short relaxation run
+        totalsteps=5,                      # Short relaxation run
         tblite_params=tblite_config,        # Pass tblite params  
         mh_params= mh_config,               # Pass MH params
         output_filename_prefix="relax_run"  # Prefix for relax outputs
