@@ -1,3 +1,4 @@
-from .total_dimer import DimerProcessor,CreateDimer, MolFrag
+from .total_dimer import MoleculeProcessor
+from .utils import relax
 
-__all__ = ["DimerProcessor", "CreateDimer", "MolFrag"]
+__all__ = ['MoleculeProcessor', 'relax']
