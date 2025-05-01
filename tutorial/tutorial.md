@@ -15,36 +15,6 @@ This Python code defines a MoleculeProcessor class using the ASE library to:
 
 The main process_molecules method orchestrates these steps.
 
-## Installation
-
-It's highly recommended to use a virtual environment to manage dependencies.  Here's how:
-
-1.  **Create a virtual environment:**
-
-```bash
-python3 -m venv dimer_env  # Creates a virtual environment named "dimer_env"
-```
-
-2. **Activate the virtual environment:**
-
-
-```bash
-source dimer_env/bin/activate  # On Linux/macOS
-```
-
-3. **Clone the repository:**
-
-```bash
-git clone https://github.com/alejandrosantanabonilla/dimer_search.git
-cd dimer_search
-```
-
-4. **Install dimer_search**
-
-```bash
-pip install .
-```
-
 # Tutorial: Using MoleculeProcessor for Generating and Relaxing Molecular Assemblies
 
 This tutorial explains how to use the `MoleculeProcessor` class, presumably from a library like `dimer_search`, to generate molecular assemblies based on specified orientations and translations. It also covers how to perform structural relaxation (e.g., energy minimization or conformational search) on these assemblies and utilize the restart feature for long calculations. We will walk through the three distinct test cases provided in the example script.
