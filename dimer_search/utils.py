@@ -1,11 +1,15 @@
 import os
 import glob
+
 import ase
 from ase.io import read, write
 from ase.io.trajectory import Trajectory
 from ase.optimize.minimahopping import MinimaHopping
 from ase.atoms import Atoms
+from tblite.ase import TBLite
+
 import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
