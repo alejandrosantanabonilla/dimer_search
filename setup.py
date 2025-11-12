@@ -14,8 +14,8 @@ setup(
     url="https://github.com/alejandrosantanabonilla/dimer_search",  # Replace with your repo URL
     packages=find_packages(),  # Automatically find packages
     install_requires=[  # List your dependencies
-        "numpy<2",
-        "rdkit-pypi",
+        "numpy",
+        "rdkit",
         "openbabel-wheel",
         "scipy",
         "parmed",
