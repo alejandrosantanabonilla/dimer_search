@@ -20,7 +20,7 @@ setup(
         "scipy",
         "parmed",
         "ase",
-        "tblite",
+        "tblite==0.4.0",
         "wheel",
     ],
     classifiers=[  # Add classifiers for your package
