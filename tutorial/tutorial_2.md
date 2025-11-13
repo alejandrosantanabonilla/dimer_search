@@ -77,10 +77,11 @@ mh_config = {
 
 These parameters define how aggressively the code searches for new, stable structures.
 
-4. Running the Processor
+## 4. Running the Processor
 
 This is the main part of the script that executes the search.
 
+```
 # --- Process the Dimer ---
 print("\n--- Creating Horizontal Dimer (No Relaxation) ---") # Note: The print statement is misleading, relaxation is ON
 output_filename = "horizontal_dimer.xyz"
@@ -95,15 +96,17 @@ result = processor.process_molecules(
         mh_params= mh_config,         # Pass the search algorithm settings
         output_filename_prefix="relax_run" # Prefix for any intermediate files
     )
-
+```
 
 The most important parameters here are:
 
+```
 relax_molecule=True: This tells MoleculeProcessor to not just save the starting guess, but to run the full basin-hopping relaxation using the provided configs.
 
 totalsteps=45: This sets the search to run for only 45 steps. This is good for a quick test, but for a real search, you will need to increase this significantly (e.g., 2000, 5000, or more).
+```
 
-Step 3: How to Run
+### Step 3: How to Run
 
 Create mol.xyz: Make sure you have a valid, optimized oleic acid monomer file named mol.xyz in this directory.
 
@@ -111,12 +114,13 @@ Save the Script: Save the script as run_search.py.
 
 Run from Terminal:
 
+```
 python run_search.py
-
+```
 
 Wait: The script will start. Since totalsteps=45 is short, it should finish quickly. It will print "Test Case completed" when done.
 
-Step 4: Results and Next Steps
+## Step 4: Results and Next Steps
 
 Interpreting Results
 
@@ -134,7 +138,7 @@ Run a Longer Search: Change totalsteps=45 to a much larger number, like totalste
 
 Try Many Starting Points: The search will only find a local minimum near its starting point. To find the global minimum, you must run this script many times with different starting geometries (i.e., different yaw, pitch, roll, and translations values). This is called "Global Optimization."
 
-What about a "Chain"?
+## What about a "Chain"?
 
 Your request mentioned a "chain" of oleic acid molecules. This script is built for a dimer (2 molecules).
 
