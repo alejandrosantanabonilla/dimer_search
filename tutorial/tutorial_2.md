@@ -1,4 +1,4 @@
-## Tutorial: Finding Stable Oleic Acid Dimer Structures
+### Tutorial: Finding Stable Oleic Acid Dimer Structures
 
 This tutorial explains how to use the provided Python script to find low-energy (stable) configurations for a dimer of oleic acid.
 The script uses the dimer_search library to perform a structural search. This process is often called "basin hopping" or a 
