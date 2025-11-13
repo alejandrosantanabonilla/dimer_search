@@ -1,10 +1,10 @@
-Tutorial: Finding Stable Oleic Acid Dimer Structures
+## Tutorial: Finding Stable Oleic Acid Dimer Structures
 
 This tutorial explains how to use the provided Python script to find low-energy (stable) configurations for a dimer of oleic acid.
+The script uses the dimer_search library to perform a structural search. This process is often called "basin hopping" or a 
+"Metropolis-Hastings" (MH) search.
 
-The script uses the dimer_search library to perform a structural search. This process is often called "basin hopping" or a "Metropolis-Hastings" (MH) search.
-
-The overall strategy is:
+# The overall strategy is:
 
 Load a Monomer: Read a single, pre-optimized oleic acid molecule from mol.xyz.
 
@@ -14,7 +14,7 @@ Search for a Stable Structure: Use a basin-hopping algorithm to "explore" differ
 
 Save the Result: The most stable structure found during the search is saved to horizontal_dimer.xyz.
 
-Step 1: Prerequisites
+# Step 1: Prerequisites
 
 Before you can run the script, you need a few things:
 
@@ -26,20 +26,20 @@ ASE: The script uses the Atomic Simulation Environment (ASE).
 
 A Monomer File (mol.xyz): This is the most important input. You must create a file named mol.xyz in the same directory as your script. This file should contain the 3D coordinates of a single, pre-optimized oleic acid molecule. You can create this using a program like Avogadro or by building it with ASE.
 
-Step 2: Understanding Your Script
+# Step 2: Understanding Your Script
 
 Let's break down each part of the script you provided.
 
-1. Initial Geometry (Rotations & Translations)
+## 1. Initial Geometry (Rotations & Translations)
 
 This is the starting guess for your simulation. The algorithm will begin its search from this geometry.
 
-# Angles for [Molecule 1, Molecule 2]
+### Angles for [Molecule 1, Molecule 2]
 yaw = np.deg2rad([0, 50])      # Rotation around Z-axis
 pitch = np.deg2rad([180, 0])   # Rotation around Y-axis
 roll = np.deg2rad([-180, 0])    # Rotation around X-axis
 
-# Positions for [Molecule 1, Molecule 2]
+### Positions for [Molecule 1, Molecule 2]
 translations = [
     [0.0, 0.0, 0.0],  # Molecule 1 at the origin
     [0.0, 0.0, -14.5] # Molecule 2 translated 14.5 Angstroms along -Z axis
@@ -52,7 +52,7 @@ Molecule 2: Is placed at [0.0, 0.0, -14.5] and rotated 50 degrees around the Z-a
 
 This is the main section you will change to explore different starting configurations.
 
-2. Configuration for tblite (The Calculator)
+## 2. Configuration for tblite (The Calculator)
 
 This dictionary sets up the "engine" that calculates the energy and forces for your molecules.
 
@@ -64,7 +64,7 @@ tblite_config = {
 
 These are solid default parameters for an xTB calculation.
 
-3. Configuration for Basin Hopping (The Search Algorithm)
+## 3. Configuration for Basin Hopping (The Search Algorithm)
 
 This dictionary controls the behavior of the Metropolis-Hastings (MH) / basin-hopping search.
 
