@@ -26,7 +26,7 @@ Navigate to your desired working directory and clone the package from GitHub.
 
 ```bash
 # Clone the repository
-git clone [https://github.com/alejandrosantanabonilla/dimer_search.git](https://github.com/alejandrosantanabonilla/dimer_search.git)
+git clone https://github.com/alejandrosantanabonilla/dimer_search.git
 ```
 
 ## Step 3: Create and Activate a Virtual Environment
