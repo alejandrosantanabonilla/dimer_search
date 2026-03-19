@@ -2,6 +2,76 @@
 
 Complicated Potential Energy Surfaces due to many different possibilities.
 
+# Installation Guide: `dimer_search` on UCL Young Cluster
+
+This guide provides step-by-step instructions to properly install the `dimer_search` package on the UCL Young cluster. It ensures that the correct compilers, Python versions, and math libraries are loaded before building the package in an isolated virtual environment.
+
+## Step 1: Clean and Load Required Modules
+Before creating your environment, purge any conflicting modules and load the specific dependencies required for the quantum chemistry engines to compile correctly.
+
+```bash
+# Clear any currently loaded modules to avoid conflicts
+module purge
+
+# Load Python 3.11
+module load python/3.11.4-gnu-10.2.0
+
+# Load the GNU compilers and OpenBLAS (crucial for underlying math/LAPACK operations)
+module load compilers/gnu/10.2.0 
+module load openblas/0.3.13-openmp/gnu-10.2.0 
+```
+
+## Step 2: Clone the Repository
+Navigate to your desired working directory and clone the package from GitHub.
+
+```bash
+# Clone the repository
+git clone [https://github.com/alejandrosantanabonilla/dimer_search.git](https://github.com/alejandrosantanabonilla/dimer_search.git)
+```
+
+## Step 3: Create and Activate a Virtual Environment
+Create an isolated Python environment so your package dependencies do not interfere with the global cluster modules.
+
+```bash
+# Create a virtual environment named 'env_dim'
+python3 -m venv env_dim
+
+# Activate the environment
+source env_dim/bin/activate
+```
+*(Note: You must run `source env_dim/bin/activate` every time you log into the cluster to work on this project).*
+
+## Step 4: Install the Package
+Move into the cloned directory and install the package in "editable" mode (`-e`). This allows you to modify the source code later without needing to reinstall the package.
+
+```bash
+# Navigate into the source code folder
+cd dimer_search/
+
+# Install the package and its dependencies
+pip install -e .
+```
+
+## Step 5: Verify the Installation
+Run one of the built-in tutorial scripts to ensure the package and its dependencies (like `tblite`) are communicating correctly.
+
+```bash
+# Navigate to the tutorial folder
+cd tutorial/
+
+# Run the tutorial script
+python3 tutorial_3.py 
+```
+
+## Step 6: Optional Clean-Up
+If the tutorial generates standard output files that you don't need to keep, you can clean them up using the following command:
+
+```bash
+# Remove relaxation trajectories and generated geometries
+rm -r md00001.* qn0000* final_relaxed_heterodimer.xyz minima.traj best_grid_start.xyz
+```
+
+
 ## 1. The Solution: A Two-Step Hierarchical Workflow
 To efficiently find the true global minimum basin, we separate the macro-movements from the micro-relaxations:
 
